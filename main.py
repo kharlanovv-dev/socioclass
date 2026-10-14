@@ -3,27 +3,47 @@ import io, json
 from engine import make_excel_report
 
 app = Flask(__name__)
+
 STATS_FILE = "stats_data.json"
 
 def load_stats():
     try:
-        with open(STATS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return []
+        with open(STATS_FILE, "r", encoding="utf-8") as f: return json.load(f)
+    except: return []
 
 def save_stats(data):
     try:
-        with open(STATS_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-    except:
-        pass
+        with open(STATS_FILE, "w", encoding="utf-8") as f: json.dump(data, f, ensure_ascii=False, indent=4)
+    except: pass
+
 FULL_HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <title>СоциоКласс РБ Pro</title>
+    <title>Социометрия расчет онлайн — Автоматическая матрица выборов класса по Коломинскому</title>
     <meta charset="utf-8">
+    <meta name="description" content="Бесплатный онлайн-сервис для расчета школьной социометрии класса по методике Морено-Коломинского. Автоматическое создание матрицы выборов и скачивание готового отчета в Excel по ГОСТу без сбора персональных данных.">
+    <meta name="keywords" content="социометрия расчет онлайн, матрица выборов класс, социометрия эксель скачать, методика коломинского обработка, школьный психолог диагностика класса, социометрия морено онлайн">
+    
+    <!-- ИСПРАВЛЕНО: Вставили код верификации Google Search Console (ЗАМЕНИТЕ НА ВАШ КОД ИЗ ШАГА 1) -->
+    <meta name="google-site-verification" content="Au-ztOJzvUxeWk8U-7pmlryRtm2wmYTwfAJRXLYIhWY" />
+    
+    <script type="text/javascript" >
+       (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+       m[i].l=1*new Date();
+       for (var j = 0; j < t.length; j++) {if (t[j].crossOrigin) { return; }}
+       k=e.createElement(t),a=e.getElementsByTagName(t),k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+       (window, document, "script", "https://yandex.ru", "ym");
+
+       ym(98765432, "init", {
+            clickmap:true,
+            trackLinks:true,
+            accurateTrackBounce:true,
+            webvisor:true
+       });
+    </script>
+    <noscript><div><img src="https://yandex.ru" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 30px; background-color: #f8fafc; color: #1e293b; line-height: 1.5; }
         .container { max-width: 1100px; margin: 0 auto; }
@@ -55,7 +75,9 @@ FULL_HTML_TEMPLATE = """
         .info-bar { color: #64748b; font-style: italic; font-size: 13px; margin-bottom: 15px; display: flex; align-items: center; }
         .info-bar::before { content: "ℹ️"; margin-right: 6px; }
         .bot-bar { display: flex; justify-content: space-between; margin-top: 35px; padding-top: 20px; border-top: 2px solid #f1f5f9; gap: 15px; }
+        .seo-text { margin-top: 50px; font-size: 13px; color: #64748b; text-align: justify; background: #fff; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; }
     </style>
+
     <script>
         function toggleChoice(studentFrom, studentTo, type) {
             let card = document.getElementById(`card_${studentFrom}_${studentTo}`);
