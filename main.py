@@ -3,8 +3,21 @@ import io, json
 from engine import make_excel_report
 
 app = Flask(__name__)
+STATS_FILE = "stats_data.json"
 
-# Весь шаблон сайта в одной переменной
+def load_stats():
+    try:
+        with open(STATS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return []
+
+def save_stats(data):
+    try:
+        with open(STATS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+    except:
+        pass
 FULL_HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="ru">
@@ -50,67 +63,40 @@ FULL_HTML_TEMPLATE = """
             let mInput = document.getElementById(`in_m_${studentFrom}_${studentTo}`);
             let limP = parseInt(document.getElementById('limit_p').value) || 0;
             let limM = parseInt(document.getElementById('limit_m').value) || 0;
-            
             if (type === 'plus') {
                 if (!card.classList.contains('active-p')) {
                     if (limP > 0) {
                         let activePluses = document.querySelectorAll(`[id^="in_p_${studentFrom}_"][value="1"]`).length;
-                        if (activePluses >= limP) {
-                            alert(`Превышен лимит! Не более ${limP} выборов (+) для одного ученика.`);
-                            return;
-                        }
+                        if (activePluses >= limP) { alert(`Превышен лимит! Не более ${limP} выборов (+) для одного ученика.`); return; }
                     }
-                    card.classList.remove('active-m'); card.classList.add('active-p');
-                    pInput.value = "1"; mInput.value = "0";
-                } else {
-                    card.classList.remove('active-p'); pInput.value = "0";
-                }
+                    card.classList.remove('active-m'); card.classList.add('active-p'); pInput.value = "1"; mInput.value = "0";
+                } else { card.classList.remove('active-p'); pInput.value = "0"; }
             } else {
                 if (!card.classList.contains('active-m')) {
                     if (limM > 0) {
                         let activeMinuses = document.querySelectorAll(`[id^="in_m_${studentFrom}_"][value="1"]`).length;
-                        if (activeMinuses >= limM) {
-                            alert(`Превышен лимит! Не более ${limM} отклонений (-) для одного ученика.`);
-                            return;
-                        }
+                        if (activeMinuses >= limM) { alert(`Превышен лимит! Не более ${limM} отклонений (-) для одного ученика.`); return; }
                     }
-                    card.classList.remove('active-p'); card.classList.add('active-m');
-                    mInput.value = "1"; pInput.value = "0";
-                } else {
-                    card.classList.remove('active-m'); mInput.value = "0";
-                }
+                    card.classList.remove('active-p'); card.classList.add('active-m'); mInput.value = "1"; pInput.value = "0";
+                } else { card.classList.remove('active-m'); mInput.value = "0"; }
             }
         }
-        
         function clearAllData() {
             if (confirm("Вы уверены, что хотите полностью сбросить всю матрицу класса?")) {
-                document.querySelectorAll('.tile-card').forEach(c => {
-                    if(!c.classList.contains('self-block')) c.classList.remove('active-p', 'active-m');
-                });
+                document.querySelectorAll('.tile-card').forEach(c => { if(!c.classList.contains('self-block')) c.classList.remove('active-p', 'active-m'); });
                 document.querySelectorAll('input[id^="in_"]').forEach(i => i.value = "0");
             }
         }
-
         function validateForm() {
             let totalStudents = parseInt(document.getElementById('student_count_val').value) || 0;
             let unfilled = [];
             document.querySelectorAll('.student-block').forEach(b => b.style.borderColor = '#e2e8f0');
-
             for (let i = 1; i <= totalStudents; i++) {
                 let hasPlus = document.querySelectorAll(`[id^="in_p_${i}_"][value="1"]`).length > 0;
                 let hasMinus = document.querySelectorAll(`[id^="in_m_${i}_"][value="1"]`).length > 0;
-                if (!hasPlus && !hasMinus) {
-                    unfilled.push(i);
-                    let block = document.getElementById(`block_student_${i}`);
-                    if (block) block.style.borderColor = '#ef4444';
-                }
+                if (!hasPlus && !hasMinus) { unfilled.push(i); let block = document.getElementById(`block_student_${i}`); if (block) block.style.borderColor = '#ef4444'; }
             }
-
-            if (unfilled.length > 0) {
-                let msg = `Внимание! Ученики под номерами: ${unfilled.join(', ')} остались незаполненными.\\n\\n`;
-                msg += `Вы уверены, что хотите сформировать и скачать отчет с пустыми строками?`;
-                return confirm(msg);
-            }
+            if (unfilled.length > 0) { return confirm(`Внимание! Ученики под номерами: ${unfilled.join(', ')} остались незаполненными.\\n\\nВы уверены, что хотите скачать отчет?`); }
             return true;
         }
     </script>
@@ -121,101 +107,41 @@ FULL_HTML_TEMPLATE = """
         <h2>🧠 СоциоКласс РБ Pro</h2>
         <p>Профессиональный автоматический расчет школьной социометрии Морено-Коломинского без сбора персональных данных</p>
     </div>
-    
     <form method="POST" onsubmit="if(event.submitter && event.submitter.value === 'export') { return validateForm(); }">
-        <div class="card">
-            <div class="param-grid">
-                <div>
-                    <label>Страна отчета</label>
-                    <select name="country">
-                        <option value="РБ" {% if country=='РБ' %}selected{% endif %}>Республика Беларусь</option>
-                        <option value="РФ" {% if country=='РФ' %}selected{% endif %}>Российская Федерация</option>
-                    </select>
-                </div>
-                <div>
-                    <label>Название учреждения</label>
-                    <input type="text" name="school" value="{{ school }}" required>
-                </div>
-                <div>
-                    <label>Класс</label>
-                    <input type="text" name="cls" value="{{ cls }}" required>
-                </div>
-                <div>
-                    <label>ФИО психолога</label>
-                    <input type="text" name="expert" value="{{ expert }}" required>
-                </div>
-            </div>
+        <div class="card"><div class="param-grid">
+            <div><label>Страна отчета</label><select name="country"><option value="РБ" {% if country=='РБ' %}selected{% endif %}>Республика Беларусь</option><option value="РФ" {% if country=='РФ' %}selected{% endif %}>Российская Федерация</option></select></div>
+            <div><label>Название учреждения</label><input type="text" name="school" value="{{ school }}" required></div>
+            <div><label>Класс</label><input type="text" name="cls" value="{{ cls }}" required></div>
+            <div><label>ФИО психолога</label><input type="text" name="expert" value="{{ expert }}" required></div>
+        </div></div>
+        <div class="card" style="border-top: 3px solid #3b82f6;"><div class="param-grid">
+            <div><label>Учеников в классе (2-40)</label><input type="number" id="student_count_val" name="count" value="{{ count }}" min="2" max="40" required></div>
+            <div><label>Лимит выборов (+)</label><input type="number" id="limit_p" name="limit_p" value="{{ limit_p }}"></div>
+            <div><label>Лимит отклонений (-)</label><input type="number" id="limit_m" name="limit_m" value="{{ limit_m }}"></div>
+            <div><label>Порог «Звезд» (>=)</label><input type="number" name="thresh_star" value="{{ thresh_star }}"></div>
+            <div><label>Порог «Отвергаемых» (<=)</label><input type="number" name="thresh_rej" value="{{ thresh_rej }}"></div>
         </div>
-        
-        <div class="card" style="border-top: 3px solid #3b82f6;">
-            <div class="param-grid">
-                <div>
-                    <label>Учеников в классе (2-40)</label>
-                    <input type="number" id="student_count_val" name="count" value="{{ count }}" min="2" max="40" required>
-                </div>
-                <div>
-                    <label>Лимит выборов (+)</label>
-                    <input type="number" id="limit_p" name="limit_p" value="{{ limit_p }}">
-                </div>
-                <div>
-                    <label>Лимит отклонений (-)</label>
-                    <input type="number" id="limit_m" name="limit_m" value="{{ limit_m }}">
-                </div>
-                <div>
-                    <label>Порог «Звезд» (>=)</label>
-                    <input type="number" name="thresh_star" value="{{ thresh_star }}">
-                </div>
-                <div>
-                    <label>Порог «Отвергаемых» (<=)</label>
-                    <input type="number" name="thresh_rej" value="{{ thresh_rej }}">
-                </div>
-            </div>
-            
-            <div style="margin-top: 20px; display: flex; align-items: center;">
-                <input type="checkbox" name="calc_indices" value="1" id="calc_ind" {% if calc_indices %}checked{% endif %} style="width:auto; margin-right:10px; cursor:pointer;">
-                <label for="calc_ind" style="display:inline; font-weight:500; color:#334155; text-transform:none; cursor:pointer; font-size:14px;">Рассчитать и вывести групповые индексы (ИБВ, ИГС)</label>
-            </div>
-            <button type="submit" name="action" value="set_count" class="btn btn-panel">🔄 Создать / Обновить список класса</button>
+        <div style="margin-top: 20px; display: flex; align-items: center;">
+            <input type="checkbox" name="calc_indices" value="1" id="calc_ind" {% if calc_indices %}checked{% endif %} style="width:auto; margin-right:10px; cursor:pointer;">
+            <label for="calc_ind" style="display:inline; font-weight:500; color:#334155; text-transform:none; cursor:pointer; font-size:14px;">Рассчитать индексы (ИБВ, ИГС)</label>
         </div>
+        <button type="submit" name="action" value="set_count" class="btn btn-panel">🔄 Создать / Обновить список класса</button></div>
         {% if count_blocks > 0 %}
         <h3>📊 Интерактивная матрица выборов класса</h3>
-        <p class="info-bar">Нажимайте кнопки [+] и [-] внутри плиток одноклассников. Все персональные данные полностью защищены!</p>
-        
         {% for i in range(1, count_blocks + 1) %}
         <div class="student-block" id="block_student_{{ i }}">
             <div class="student-title">Ученик №{{ i }} оценивает коллектив:</div>
             <div class="tile-grid">
                 {% for j in range(1, count_blocks + 1) %}
-                    {% set is_active_p = j in saved_data.get(i, {}).get('plus', []) %}
-                    {% set is_active_m = j in saved_data.get(i, {}).get('minus', []) %}
-                    
-                    {% if i == j %}
-                    <div class="tile-card self-block" id="card_{{i}}_{{j}}">
-                        <div class="tile-num">№{{ j }}</div>
-                        <div style="font-size:11px; font-style:italic;">Сам себя</div>
-                    </div>
-                    {% else %}
-                    <div class="tile-card {% if is_active_p %}active-p{% elif is_active_m %}active-m{% endif %}" id="card_{{i}}_{{j}}">
-                        <div class="tile-num">№{{ j }}</div>
-                        <div class="sub-btn-grid">
-                            <button type="button" class="btn-sub" onclick="toggleChoice({{i}}, {{j}}, 'plus')">+</button>
-                            <button type="button" class="btn-sub" onclick="toggleChoice({{i}}, {{j}}, 'minus')">-</button>
-                        </div>
-                        <input type="hidden" id="in_p_{{i}}_{{j}}" name="in_p_{{i}}_{{j}}" value="{% if is_active_p %}1{% else %}0{% endif %}">
-                        <input type="hidden" id="in_m_{{i}}_{{j}}" name="in_m_{{i}}_{{j}}" value="{% if is_active_m %}1{% else %}0{% endif %}">
-                    </div>
-                    {% endif %}
+                    {% set is_active_p = j in saved_data.get(i, {}).get('plus', []) %}{% set is_active_m = j in saved_data.get(i, {}).get('minus', []) %}
+                    {% if i == j %}<div class="tile-card self-block" id="card_{{i}}_{{j}}"><div class="tile-num">№{{ j }}</div><div style="font-size:11px; font-style:italic;">Сам себя</div></div>
+                    {% else %}<div class="tile-card {% if is_active_p %}active-p{% elif is_active_m %}active-m{% endif %}" id="card_{{i}}_{{j}}"><div class="tile-num">№{{ j }}</div><div class="sub-btn-grid"><button type="button" class="btn-sub" onclick="toggleChoice({{i}}, {{j}}, 'plus')">+</button><button type="button" class="btn-sub" onclick="toggleChoice({{i}}, {{j}}, 'minus')">-</button></div><input type="hidden" id="in_p_{{i}}_{{j}}" name="in_p_{{i}}_{{j}}" value="{% if is_active_p %}1{% else %}0{% endif %}"><input type="hidden" id="in_m_{{i}}_{{j}}" name="in_m_{{i}}_{{j}}" value="{% if is_active_m %}1{% else %}0{% endif %}"></div>{% endif %}
                 {% endfor %}
             </div>
         </div>
         {% endfor %}
-        
-        <!-- ИСПРАВЛЕНО: Добавлено JavaScript-предупреждение на кнопку «Начальный экран» -->
         <div class="bot-bar">
-            <div>
-                <button type="button" class="btn" style="background-color:#ef4444; margin-right: 10px;" onclick="clearAllData()">🗑️ Очистить матрицу</button>
-                <button type="submit" name="action" value="reset_home" class="btn" style="background-color:#3b82f6;" onclick="return confirm('Вы уверены, что хотите вернуться на начальный экран?\\n\\nВсе текущие внесенные данные этого класса будут безвозвратно удалены!')">🏠 Начальный экран</button>
-            </div>
+            <div><button type="button" class="btn" style="background-color:#ef4444; margin-right: 10px;" onclick="clearAllData()">🗑️ Очистить матрицу</button><button type="submit" name="action" value="reset_home" class="btn" style="background-color:#3b82f6;">🏠 Начальный экран</button></div>
             <button type="submit" name="action" value="export" class="btn">🟢 Сформировать и скачать отчет Excel</button>
         </div>
         {% endif %}
@@ -224,7 +150,6 @@ FULL_HTML_TEMPLATE = """
 </body>
 </html>
 """
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     school, cls, expert, count = "Школа №1", "10-А", "И.И. Иванов", "10"
@@ -233,53 +158,46 @@ def index():
     calc_indices = True
     count_blocks = 0
     saved_data = {}
-
     if request.method == "POST":
         action = request.form.get("action")
-        
-        if action == "reset_home":
-            return redirect(url_for('index'))
-            
-        country = request.form.get("country")
-        school = request.form.get("school")
-        cls = request.form.get("cls")
-        expert = request.form.get("expert")
-        count = request.form.get("count")
-        limit_p = request.form.get("limit_p", "0")
-        limit_m = request.form.get("limit_m", "0")
-        thresh_star = request.form.get("thresh_star", "3")
-        thresh_rej = request.form.get("thresh_rej", "0")
+        if action == "reset_home": return redirect(url_for('index'))
+        country, school, cls, expert, count = request.form.get("country"), request.form.get("school"), request.form.get("cls"), request.form.get("expert"), request.form.get("count")
+        limit_p, limit_m, thresh_star, thresh_rej = request.form.get("limit_p", "0"), request.form.get("limit_m", "0"), request.form.get("thresh_star", "3"), request.form.get("thresh_rej", "0")
         calc_indices = True if request.form.get("calc_indices") else False
-        
         c_int = int(count)
         count_blocks = c_int
-        
         for i in range(1, c_int + 1):
             saved_data[i] = {
                 'plus': [j for j in range(1, c_int + 1) if request.form.get(f"in_p_{i}_{j}") == "1"],
                 'minus': [j for j in range(1, c_int + 1) if request.form.get(f"in_m_{i}_{j}") == "1"]
             }
-
         if action == "export":
-            ts = int(thresh_star) if thresh_star.isdigit() else 3
-            tr = int(thresh_rej) if thresh_rej.isdigit() else 0
-            
-            # --- ВНУТРЕННИЙ СЧЁТЧИК СКАЧИВАНИЙ ---
             try:
                 from datetime import datetime
-                # Дописываем строчку с датой, временем и классом в файл статистики
-                with open("stats.txt", "a", encoding="utf-8") as stat_file:
-                    stat_file.write(f"{datetime.now().strftime('%d.%m.%Y %H:%M:%S')} -- Скачан отчет для класса: {cls}\\n")
-            except Exception as e:
-                pass # Если файл занят, программа не будет падать и заблокирует ошибку
-            # --- КОНЕЦ СЧЁТЧИКА ---
-
+                current_stats = load_stats()
+                current_stats.append(f"{datetime.now().strftime('%d.%m.%Y %H:%M:%S')} -- Скачан отчет: {cls} ({country})")
+                save_stats(current_stats)
+            except: pass
+            ts, tr = (int(thresh_star) if thresh_star.isdigit() else 3), (int(thresh_rej) if thresh_rej.isdigit() else 0)
             memory_file = io.BytesIO()
             make_excel_report(school, cls, expert, saved_data, memory_file, ts, tr, country, calc_indices)
             memory_file.seek(0)
             return send_file(memory_file, download_name=f"Sociometry_{cls}.xlsx", as_attachment=True, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
     return render_template_string(FULL_HTML_TEMPLATE, school=school, cls=cls, expert=expert, count=count, count_blocks=count_blocks, limit_p=limit_p, limit_m=limit_m, thresh_star=thresh_star, thresh_rej=thresh_rej, country=country, calc_indices=calc_indices, saved_data=saved_data)
+
+@app.route("/secret-stats")
+def show_secret_stats():
+    logs = load_stats()
+    html_logs = "".join(f"<li style='padding:8px 0; border-bottom:1px solid #e2e8f0; font-family:monospace;'>{log}</li>" for log in reversed(logs))
+    return f"""<html><head><title>Статистика</title><meta charset='utf-8'></head>
+    <body style='font-family:Arial,sans-serif; margin:40px; background:#f8fafc; color:#1e293b;'>
+        <div style='max-width:800px; margin:0 auto; background:white; padding:30px; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.05);'>
+            <h2 style='color:#1e3a8a; border-bottom:2px solid #e2e8f0; padding-bottom:10px;'>📊 Логи скачиваний отчетов</h2>
+            <p>Всего успешных скачиваний: <strong>{len(logs)}</strong></p>
+            <ul style='list-style:none; padding:0;'>{html_logs}</ul>
+            <br><a href='/' style='color:#3b82f6; text-decoration:none; font-weight:bold;'>← Вернуться на главную</a>
+        </div>
+    </body></html>"""
 
 if __name__ == "__main__":
     app.run(debug=True)
