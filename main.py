@@ -263,6 +263,17 @@ def index():
         if action == "export":
             ts = int(thresh_star) if thresh_star.isdigit() else 3
             tr = int(thresh_rej) if thresh_rej.isdigit() else 0
+            
+            # --- ВНУТРЕННИЙ СЧЁТЧИК СКАЧИВАНИЙ ---
+            try:
+                from datetime import datetime
+                # Дописываем строчку с датой, временем и классом в файл статистики
+                with open("stats.txt", "a", encoding="utf-8") as stat_file:
+                    stat_file.write(f"{datetime.now().strftime('%d.%m.%Y %H:%M:%S')} -- Скачан отчет для класса: {cls}\\n")
+            except Exception as e:
+                pass # Если файл занят, программа не будет падать и заблокирует ошибку
+            # --- КОНЕЦ СЧЁТЧИКА ---
+
             memory_file = io.BytesIO()
             make_excel_report(school, cls, expert, saved_data, memory_file, ts, tr, country, calc_indices)
             memory_file.seek(0)
